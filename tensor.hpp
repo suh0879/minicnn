@@ -30,9 +30,10 @@ class Tensor {
         }
 
         float& operator()(size_t n, size_t c=0, size_t h=0, size_t w=0) {
-            // TODO
-            // define the data layout for the Tensor
+            // define the data layout for the Tensor 
             // access the Tensor element
+	    size_t index = n*(C*H*W) + c*(H*W) + h*W + w;  
+	    return data()[index]; 
         }
 
         Tensor slice(size_t idx, size_t num) {
