@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <fstream>
-#include <string>
+#include <string>   
 
 #include "tensor.hpp"
 
@@ -81,6 +81,11 @@ class MNIST {
                 }
                 std::cout << std::endl;
             }
+        }
+
+        size_t total_imgs() 
+        {
+            return imgs_.N; 
         }
 
     private:
