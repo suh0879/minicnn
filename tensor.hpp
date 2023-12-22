@@ -29,11 +29,29 @@ class Tensor {
             std::fill(data_->begin(), data_->end(), c);
         }
 
+        void print()
+        { 
+            for (size_t n = 0; n < N; ++n)
+            {
+                for (size_t c = 0; c < C; ++c)
+                {
+                    for (size_t h = 0; h < H; ++h)
+                    {
+                        for (size_t w = 0; w < W; ++w)
+                        {
+                            std::cout << operator()(n,c,h,w) << " "; 
+                        }
+                        std::cout << std::endl;
+                    }
+                }
+            }
+        }
+
         float& operator()(size_t n, size_t c=0, size_t h=0, size_t w=0) {
             // define the data layout for the Tensor 
             // access the Tensor element
-	    size_t index = n*(C*H*W) + c*(H*W) + h*W + w;  
-	    return data()[index]; 
+	        size_t index = offset_ + n*(C*H*W) + c*(H*W) + h*W + w;  
+	        return data()[index]; 
         }
 
         Tensor slice(size_t idx, size_t num) {

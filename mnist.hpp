@@ -31,6 +31,7 @@ class MNIST {
             is.read(reinterpret_cast<char *>(&magic_number), 4);
             is.read(reinterpret_cast<char *>(&num_imgs), 4);
             is.read(reinterpret_cast<char *>(&num_rows), 4);
+	    
             is.read(reinterpret_cast<char *>(&num_cols), 4);
 
             if (is_little_endian()) {
@@ -50,7 +51,7 @@ class MNIST {
                 for (size_t h = 0; h < 28; ++h) {
                     for (size_t w = 0; w < 28; ++w) {
                         uint8_t byte;
-                        is.read(reinterpret_cast<char *>(&byte), 1);
+                        is.read(reinterpret_cast<char *>(&byte), 1); 
                         // scale to 0.0 .. 1.0
                         float pixel = byte / 255.f;
                         //// normalize

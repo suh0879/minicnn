@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include "mnist.hpp"
 #include "tensor.hpp"
 
@@ -9,7 +10,58 @@ int main(void)
     std::string mnistPath = "/mnt/d/Etudes/Computer-Vision/assignment/t10k-images-idx3-ubyte";
     MNIST mnist(mnistPath);
     // cout << "No. of images: " << mnist.totalimgs() << "\n"; 
+  /*
     Tensor sample = mnist.at(10);
-    
+    for (size_t n = 0; n < mnist.total_imgs(); ++n)
+    {
+        mnist.print(n);
+    }
+*/
+    Tensor input; 
+    input = mnist.at(10);
+    mnist.print(10); 
+    input.print(); 
+/*
+    // Model definition 
+    NeuralNetwork lenet(); 
+    lenet.add(Conv2d());
+    lenet.add(ReLu());
+    lenet.add(MaxPool2d()); 
+    lenet.add(Conv2d());
+    lenet.add(ReLu());
+    lenet.add(MaxPool2d()); 
+    lenet.add(Linear());
+    lenet.add(ReLu());
+    lenet.add(Linear());
+    lenet.add(ReLu());
+    lenet.add(Linear());
+    lenet.add(ReLu()); 
+    lenet.add(SoftMax()); 
+
+    //Engaging the predict - forward propogation 
+    Tensor output = lenet.predict(input);  
+    for (size_t w = 0; w < output_.W; ++w)
+    {
+        std::cout << w << "\n" << output_(0,0,0,w) << "\n"; 
+    }  
+
+    /* 
+    std::string lenetpath = "/mnt/d/Etudes/Computer-Vision/assignment/lenet.raw"
+    //std::ifstream file(lenetpath, std::ios::binary); 
+
+    file.read()
+    weights = Tensor()
+    */
     return 0; 
 }
+
+
+/*
+void load()
+{
+    //TODO: Read and print weights / biases for lenet.raw conv-1-...
+    float weights[];    
+    std::ifstream file(lenetpath, std::ios::in | std::ios::binary); 
+    file.read(reinterpret_cast<char *>)
+}
+*/
