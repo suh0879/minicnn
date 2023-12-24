@@ -15,14 +15,11 @@ int main(void)
     for (size_t n = 0; n < mnist.total_imgs(); ++n)
     {
         mnist.print(n);
-    }
-*/
-    Tensor input; 
-    input = mnist.at(10);
-    mnist.print(10); 
+    } 
     input.print(); 
-/*
-    // Model definition 
+       
+/
+   / Model definition 
     NeuralNetwork lenet(); 
     
     //Engaging the predict - forward propogation 
@@ -36,6 +33,7 @@ int main(void)
     file.read()
     weights = Tensor()
     */
+    mnist.print(1); 
     return 0; 
 }
 

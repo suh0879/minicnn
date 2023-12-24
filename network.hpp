@@ -44,18 +44,17 @@ class Layer {
             if (!bias_.empty())    std::cout << "  bias: "    << bias_    << std::endl;
             if (!output_.empty())  std::cout << "  output: "  << output_  << std::endl;
         }
-        // TODO: additional required methods  
 
         void set_input(Tensor input)
         {
             input_ = input; 
-            std::cout << "Input loaded dimensions: " << input_ << std::endl; 
         }
 
-        Tensor get_output() 
+        Tensor get_output()
         {
-            return output_;
+            return output_; 
         }
+        // TODO: additional required methods
 
     protected:
         const LayerType layer_type_;
@@ -170,27 +169,83 @@ class Conv2d : public Layer {
 
 };
 
-/*
+
 class Linear : public Layer {
     public:
-        Linear(size_t in_features, size_t out_features) : Layer(LayerType::Linear), in_features_(in_features), out_features_(out_features) {}
-    // TODO
-        void read_weights_bias(std::ifstream& inputfile) override 
-        {   
-            float bias; 
-            if (!file) 
+        size_t in_features;
+        size_t out_features; 
+        
+        Linear(size_t in_features, size_t out_features) 
+        : Layer(LayerType::Linear), in_features(in_features), out_features(out_features) 
+        {
+            weights_ = Tensor(1, 1, in_features, out_features);
+            bias_ = Tensor(1, 1, 1, out_features); 
+        }
+
+        void read_weights_bias(std::ifstream& inputfile)
+        {
+            if(!inputfile.is_open())
             {
                 std::cerr << "Cannot open file" << std::endl;
-                return 1;
             }
-            // Get intput weights and biases for each -> where you get kernels from
-
+            for (size_t wn = 0; wn < weights_.N; ++wn)
+            {
+                for (size_t wc = 0; wc < weights_.C; ++wc)
+                {
+                    for (size_t wh = 0; wh < weights_.H; ++wh)
+                    {
+                        for (size_t ww = 0; ww < weights_.W; ++ww)
+                        {
+                            float weights; 
+                            inputfile.read(reinterpret_cast<char*>(&weights), sizeof(weights));
+                            weights_(wn, wc, wh, ww) = weights; 
+                        }
+                    }
+                }
+            }
+            for (size_t b = 0; b < weights_.W; ++b)
+            {
+                float bias; 
+                inputfile.read(reinterpret_cast<char*>(&bias), sizeof(bias)); 
+                bias_(0,0,0,b) = bias;
+            }
         }
 
         void fwd()
         {
-
+            if (input_.empty() || weights_.empty() || bias_.empty()) 
+            {
+                if (weights_.empty()) {std::cerr << "Weights is null." << std::endl; }
+                if (bias_.empty()) {std::cerr << "Bias is null." << std::endl; }
+                if (input_.empty()) {std::cerr << "Input is null." << std::endl; }
+                return;  
+            }
+            output_ = Tensor(input_.N, input_.C, input_.H, out_features); 
+            for (size_t n = 0; n < output_.N; ++n)
+            {
+                for (size_t c = 0; c < output_.C; ++c)
+                {
+                    for (size_t h = 0; h < output_.H; ++h)
+                    {
+                        for (size_t w = 0; w < output_.W; ++w)
+                        {
+                            // output is row of a -> col of b
+                            float value = 0.0;
+                            for (size_t i = 0; i < in_features; ++i)
+                            {
+                                value += input_(n, c, h, i)*weights_(n, c, i, w); 
+                            }
+                            output_(n, c, h, w) = value + bias_(0, 0, 0, w); 
+                        }
+                    }
+                }
+            }
+            if (output_.empty())
+            {
+                std::cout << "Output tensor is empty after fwd()! \n"; 
+            }
         }
+    // TODO.
 };
 
 
@@ -251,11 +306,11 @@ class ReLu : public Layer {
     public:
         ReLu() : Layer(LayerType::ReLu) {}
     // TODO
-        void read_weights_bias(std::ifstream& inputfile) override 
+        void read_weights_bias(std::ifstream& inputfile)  
         {
 
         }
-        void fwd() override
+        void fwd() 
         {
             output_ = Tensor(input_.N, input_.C, input_.H, input_.W);
             for (size_t n = 0; n < input_.N; ++n)
@@ -271,6 +326,10 @@ class ReLu : public Layer {
                     }
                 }
             }
+            if (output_.empty())
+            {
+                std::cout << "Output tensor is empty after fwd()! \n"; 
+            }
         }
 };
 
@@ -279,26 +338,61 @@ class SoftMax : public Layer {
     public:
         SoftMax() : Layer(LayerType::SoftMax) {}
     // TODO
-    void fwd()
-    {   
-        float sum_exp = 0.0;
-        for (size_t w = 0; w < input_.w; ++w)
+        void read_weights_bias(std::ifstream& inputfile)
         {
-            sum_exp += exp(input_(0,0,0,w)); 
-        } 
-        for (size_t i = 0; i < input_.W; ++i)
-        {
-            output_(0,0,0,w) = exp(input_(0,0,0,w)) / sum_exp; 
+
         }
-    }   
-    
+        void fwd()
+        {   
+            output_ = Tensor(input_.N, input_.C, input_.H, input_.W);
+            float sum_exp = 0.0;
+            for (size_t w = 0; w < input_.W; ++w)
+            {
+                sum_exp += exp(input_(0,0,0,w)); 
+            } 
+            for (size_t i = 0; i < input_.W; ++i)
+            {
+                output_(0,0,0,i) = exp(input_(0,0,0,i)) / sum_exp; 
+            }
+            if (output_.empty())
+            {
+                std::cout << "Output tensor is empty after fwd()! \n"; 
+            }
+        } 
 };
 
 
 class Flatten : public Layer {
-    public:
+    public: 
         Flatten() : Layer(LayerType::Flatten) {}
-    // TODO
+
+        void read_weights_bias(std::ifstream& inputfile)
+        {
+
+        }
+
+        void fwd()
+        {
+            output_ = Tensor(input_.N, 1, 1, input_.C*input_.H*input_.W); 
+            for (size_t n = 0; n < input_.N; ++n)
+            {
+                for (size_t c = 0; c < input_.C; ++c)
+                {
+                    for (size_t h = 0; h < input_.H; ++h)
+                    {
+                        for (size_t w = 0; w < input_.W; ++w)
+                        {
+                            size_t flat_index = n*input_.C*input_.H*input_.W+ c*input_.H*input_.W + h*input_.W + w; 
+                            output_(n,0,0,flat_index) = input_(n,c,h,w);
+                        }
+                    }
+                }
+            }
+              if (output_.empty())
+            {
+                std::cout << "Output tensor is empty after fwd()! \n"; 
+            }
+        }
 };
 
 
@@ -366,5 +460,5 @@ class NeuralNetwork {
         std::vector<Layer*> NN;   
         // TODO: storage for layers
 };
-*/
+
 #endif // NETWORK_HPP
