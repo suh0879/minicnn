@@ -30,29 +30,6 @@ std::ostream& operator<< (std::ostream& os, LayerType layer_type) {
     return os << static_cast<std::uint8_t>(layer_type);
 }
 
-float convolve(Tensor input_, Tensor weights_, n, c, h, w)
-        {
-            float value = 0.0; 
-            //Weights_.N would get kernel input channel  = input_channel 
-            //Returns the value after the convolution operation is performed on the elements 
-            float kernel_center_w = weights_.w/2;
-            float kernel_center_h = weights_.h/2;
-            for (size_t kernel_c = 0; kernel_c < weights_.C; ++kernel_c)
-            {
-                for (size_t kernel_h = 0; kernet_h < weights_.H; ++kernel_h)
-                {
-                    for (size_t kernel_w = 0; kernel_w < weights_.W; ++kernel_w)
-                    {
-                        // convolve operation on each input - adjust the input centre 
-                        size_t input_h = stride*h + kernel_h - kernel_center_h; 
-                        size_t input_w = stride*w + kernel_w - kernel_center_w;
-                        value += input_.operator(n, kernel_c, input_h, input_w)*weights_.operator(c, kernel_c, kernel_h, kernel_w)
-                    }
-                }
-            }
-            return value 
-        }
-
 class Layer {
     public:
         Layer(LayerType layer_type) : layer_type_(layer_type), input_(), weights_(), bias_(), output_() {}
@@ -69,9 +46,15 @@ class Layer {
         }
         // TODO: additional required methods  
 
-        Tensor get_input()
+        void set_input(Tensor input)
         {
+            input_ = input; 
+            std::cout << "Input loaded dimensions: " << input_ << std::endl; 
+        }
 
+        Tensor get_output() 
+        {
+            return output_;
         }
 
     protected:
@@ -85,69 +68,123 @@ class Layer {
 
 class Conv2d : public Layer {
     public:
+        size_t in_channels;
+        size_t out_channels;
+        size_t kernel_size;
+        size_t stride;
+        size_t pad;
+        size_t output_H;
+        size_t output_W;
+        
         Conv2d(size_t in_channels, size_t out_channels, size_t kernel_size, size_t stride=1, size_t pad=0) 
-        : Layer(LayerType::Conv2d), in_channels_(in_channels), out_channels_(out_channels), kernel_size_(kernel_size), stride_(stride), pad_(pad) {}
- 
-    
-        void read_weights_bias(std::ifstream& inputfile) override 
-        {   
-            // Get intput weights and biases for each -> where you get kernels from
-            float weight; 
-            float bias; 
-            inputfile.read(reinterpret_cast<char *>(&weight), reinterpret_cast<char *>(&weight) + sizeof(&weight)); 
-            inputfile.read(reinterpret_cast<char *>(&bias), reinterpret_cast<char *>(&bias) + sizeof(bias)); 
-            
-            weights_ = Tensor()
-        }
-        
-        
-
-        void fwd() override 
+        : Layer(LayerType::Conv2d), in_channels(in_channels), out_channels(out_channels),
+          kernel_size(kernel_size), stride(stride), pad(pad)
+          {
+            // Just to initialize Conv2d specific variables; 
+                weights_ = Tensor(out_channels, in_channels, kernel_size, kernel_size);
+                bias_ = Tensor(1,1,1,out_channels); 
+          }
+       
+        void read_weights_bias(std::ifstream& inputfile) 
         {
-        
-        // match_kernel_o/p & i/p channels to read weight and store the kernel sizes. 
-        //
-
-        // Getting parameters from input_ 
-        // Where do we get the input parameters from - other than the channel input
-        input_ = get_input() // -> input from MNIST dataset
-        size_t input_N = input_.N;
-        size_t input_C = in_channels_;  
-        size_t input_H = input_.H; 
-        size_t input_W = input_.W; 
-        
-        
-        //Calculating the output_ size 
-        output_H = ((input_H + 2*pad - kernel_size_) / stride) + 1;   
-        output_W = ((input_W + 2*pad - kernel_size_) / stride) + 1;  
-        output_ = Tensor(input_N, out_channels_, output_H, output_W); 
-
-        for (size_t n=0; n < output_.N; ++n)
-        {
-            for (size_t c=0; c < output_.C; ++c)
+            if(!inputfile.is_open())
             {
-                for (size_t h=0; h < output_.H; ++h)
+                std::cerr << "Cannot open file" << std::endl;
+            }
+            for (size_t oc = 0; oc < out_channels; ++oc)
+            {
+                for (size_t ic = 0; ic < in_channels; ++ic)
                 {
-                    for (size_t w=0; w < output_.W; ++w)
+                    for (size_t h = 0; h < kernel_size; ++h)
                     {
-                        output_.operator(n,c,h,w) = convolve(input_, kernel_, n, c, h, w);
-                        output_.operator(n,c,h,w) += bias_.operator(n,c,h,w);
+                        for (size_t w = 0; w < kernel_size; ++w)
+                        {
+                            float weights; 
+                            inputfile.read(reinterpret_cast<char*>(&weights), sizeof(weights));
+                            weights_(oc, ic, h, w) = weights; 
+                        }
                     }
                 }
             }
+
+            for (size_t b = 0; b < output_.C; ++b)
+            {
+                float bias; 
+                inputfile.read(reinterpret_cast<char*>(&bias), sizeof(bias));
+                bias_(0,0,0,b) = bias; 
+            }
         }
-    }
-        
+
+        void fwd() 
+        {
+            if (input_.empty() || weights_.empty() || bias_.empty()) 
+            {
+                if (weights_.empty()) {std::cerr << "Weights is null." << std::endl; }
+                if (bias_.empty()) {std::cerr << "Bias is null." << std::endl; }
+                if (input_.empty()) {std::cerr << "Input is null." << std::endl; }
+                return;  
+            }
+            output_H = ((input_.H + 2 * pad - kernel_size) / stride) + 1;
+            output_W = ((input_.W + 2 * pad - kernel_size) / stride) + 1;
+            output_ = Tensor(input_.N, out_channels, output_H, output_W); 
+            for (size_t n = 0; n < output_.N; ++n)
+            {
+                for (size_t c = 0; c < output_.C; ++c)
+                {
+                    for (size_t h = 0; h < output_.H; ++h)
+                    {
+                        for (size_t w = 0; w < output_.W; ++w)
+                        {
+                            float value = 0.0; 
+                            for (size_t wo = 0; wo < weights_.N; ++wo)
+                            {
+                                for (size_t wi = 0; wi < weights_.C; ++wi)
+                                {
+                                    for (size_t wh = 0; wh < weights_.H; ++wh)
+                                    {
+                                        for (size_t ww = 0; ww < weights_.W; ++ww)
+                                        {
+                                            size_t input_h = stride * h + wh - 2*pad;
+                                            size_t input_w = stride * w + ww - 2*pad;
+                                            if (input_h < 0 || input_h >= input_.H || input_w < 0 || input_w >= input_.W) 
+                                            {
+                                                std::cerr << "Error: Input indices out of bounds." << std::endl;
+                                                return;
+                                            }
+                                            value += input_(n, wi, input_h, input_w)*weights_(wo, wi, wh, ww);
+                                        }
+                                    }
+                                }
+
+                            }
+                            output_(n,c,h,w) = value + bias_(0,0,0,c);
+                        }
+                    }
+                }
+            }
+            if (output_.empty())
+            {
+                std::cout << "Output tensor is empty after fwd()! \n"; 
+            }
+        }
+
 };
 
-
+/*
 class Linear : public Layer {
     public:
         Linear(size_t in_features, size_t out_features) : Layer(LayerType::Linear), in_features_(in_features), out_features_(out_features) {}
     // TODO
         void read_weights_bias(std::ifstream& inputfile) override 
         {   
+            float bias; 
+            if (!file) 
+            {
+                std::cerr << "Cannot open file" << std::endl;
+                return 1;
+            }
             // Get intput weights and biases for each -> where you get kernels from
+
         }
 
         void fwd()
@@ -159,29 +196,54 @@ class Linear : public Layer {
 
 class MaxPool2d : public Layer {
     public:
-        MaxPool2d(size_t kernel_size, size_t stride=1, size_t pad=0) : Layer(LayerType::MaxPool2d), kernel_size_(kernel_size), stride_(stride), pad_(pad) {}
-    // Calculating output size
-    output_H = ((input_H + 2*pad - kernel_size_) / stride) + 1;   
-    output_W = ((input_W + 2*pad - kernel_size_) / stride) + 1;      
-    output_ = Tensor(N, C, H, W);  
-    void fwd()
-    {
-        for (size_t n=0; n < output_.N; ++n)
+    size_t output_H;
+    size_t output_W;
+    size_t kernel_size; 
+    size_t stride; 
+    size_t pad; 
+
+        MaxPool2d(size_t kernel_size, size_t stride=2, size_t pad=0) 
+        : Layer(LayerType::MaxPool2d), kernel_size(kernel_size), stride(stride), pad(pad)
         {
-            for (size_t c=0; c < output_.C; ++c)
+
+        }
+
+        void read_weights_bias(std::ifstream& inputfile)
+        {
+
+        }
+
+        void fwd()
+        {
+            output_H = ((input_.H + 2 * pad - kernel_size) / stride) + 1;
+            output_W = ((input_.W + 2 * pad - kernel_size) / stride) + 1;
+            output_ = Tensor(input_.N, input_.C, output_H, output_W); 
+            for (size_t n = 0; n < output_.N; ++n)
             {
-                for (size_t h=0; h < output_.H; ++h)
+                for (size_t c = 0; c < output_.C; ++c)
                 {
-                    for(size_t w=0; w < output_.W; ++w)
+                    for (size_t h = 0; h < output_.H; ++h)
                     {
-                        output_.operator(n,c,h,w) = convolve(input_, kernel_, n, c, h, w);
-                        output_.operator(n,c,h,w) += bias_.operator(n, c, h, w);
+                        for (size_t w = 0; w < output_.W; ++w)
+                        {
+                            std::vector<float> values; 
+                            for (size_t kh = 0; kh < kernel_size; ++kh)
+                            {
+                                for (size_t kw = 0; kw < kernel_size; ++kw)
+                                {
+                                    values.push_back(input_(n,c,kh,kw)); 
+                                }
+                            }
+                            output_(n,c,h,w) = *(std::max_element(values.begin(), values.end())); 
+                        }
                     }
                 }
             }
+            if (output_.empty())
+            {
+                std::cout << "Output tensor is empty after fwd()! \n"; 
+            }
         }
-
-    }
 };
 
 
@@ -189,22 +251,27 @@ class ReLu : public Layer {
     public:
         ReLu() : Layer(LayerType::ReLu) {}
     // TODO
-    void fwd() override
-    {
-        for (size_t n = 0; n < input_.N; ++n)
+        void read_weights_bias(std::ifstream& inputfile) override 
         {
-            for (size_t c = 0; c < input_.C; ++c)
+
+        }
+        void fwd() override
+        {
+            output_ = Tensor(input_.N, input_.C, input_.H, input_.W);
+            for (size_t n = 0; n < input_.N; ++n)
             {
-                for (size_t h = 0; h < input_.H; ++h)
+                for (size_t c = 0; c < input_.C; ++c)
                 {
-                    for (size_t w = 0; w < input_.W; ++w)
+                    for (size_t h = 0; h < input_.H; ++h)
                     {
-                        output_(n,c,h,w) = max(0.0, input_(n,c,h,w))
+                        for (size_t w = 0; w < input_.W; ++w)
+                        {
+                            output_(n,c,h,w) = std::max(0.0f, input_(n,c,h,w));
+                        }
                     }
                 }
             }
         }
-    }
 };
 
 
@@ -243,43 +310,46 @@ class NeuralNetwork {
             // TODO
             // This works by trying to "push" all the layers into one container. 
             assert(layer != NULL); 
-            lenet.push_back(layer); 
+            NN.push_back(layer); 
 
         }
 
         void load(std::string file) {
             // TODO
-            // only for layers where you implmement read_weight_bias() you need to take care of loading the weights and biases   
-            for (auto layer : lenet)
+            // only for layers where you implmement read_weights_bias() you need to take care of loading the weights and biases   
+            std::ifstream is(path_.c_str(), std::ios::in | std::ios::binary);
+            for (auto layer : NN)
             {
-                layer->read_weights_bias(); 
+                layer->read_weights_bias(file); 
             }
         }
 
         Tensor predict(Tensor input) {
             // TODO
-            //print the input digit along with the probabilities 
-            Tensor ouput = input; 
+            //print the input digit along with the probabilities  
             //add layers using the method 
-            lenet.add(Conv2d(1, 6, 5));
-            lenet.add(ReLu());
-            lenet.add(MaxPool2d(2)); 
-            lenet.add(Conv2d(6, 16, 5));
-            lenet.add(ReLu());
-            lenet.add(MaxPool2d(2)); 
-            lenet.add(Flatten());
-            lenet.add(Linear(400, 120));
-            lenet.add(ReLu());
-            lenet.add(Linear(120, 84));
-            lenet.add(ReLu());
-            lenet.add(Linear(84, 10));
-            lenet.add(ReLu()); 
-            lenet.add(SoftMax()); 
+            add(Conv2d(1, 6, 5));
+            add(ReLu());
+            add(MaxPool2d(2)); 
+            add(Conv2d(6, 16, 5));
+            add(ReLu());
+            add(MaxPool2d(2)); 
+            add(Flatten());
+            add(Linear(400, 120));
+            add(ReLu());
+            add(Linear(120, 84));
+            add(ReLu());
+            add(Linear(84, 10));
+            add(ReLu()); 
+            add(SoftMax()); 
 
+            Tensor ouput = input;
             //printting the output of the layers. 
             for (auto layer : lenet)
             {
-                output = layer->fwd(output) 
+                layer->set_input(output);
+                layer->fwd();
+                output = layer->get_output();   
             }         
             
             if(debug_)
@@ -293,8 +363,8 @@ class NeuralNetwork {
         }
     private:
         bool debug_;
-        std::vector<Layer> lenet;   
+        std::vector<Layer*> NN;   
         // TODO: storage for layers
 };
-
+*/
 #endif // NETWORK_HPP

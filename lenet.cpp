@@ -24,26 +24,10 @@ int main(void)
 /*
     // Model definition 
     NeuralNetwork lenet(); 
-    lenet.add(Conv2d());
-    lenet.add(ReLu());
-    lenet.add(MaxPool2d()); 
-    lenet.add(Conv2d());
-    lenet.add(ReLu());
-    lenet.add(MaxPool2d()); 
-    lenet.add(Linear());
-    lenet.add(ReLu());
-    lenet.add(Linear());
-    lenet.add(ReLu());
-    lenet.add(Linear());
-    lenet.add(ReLu()); 
-    lenet.add(SoftMax()); 
-
+    
     //Engaging the predict - forward propogation 
     Tensor output = lenet.predict(input);  
-    for (size_t w = 0; w < output_.W; ++w)
-    {
-        std::cout << w << "\n" << output_(0,0,0,w) << "\n"; 
-    }  
+      
 
     /* 
     std::string lenetpath = "/mnt/d/Etudes/Computer-Vision/assignment/lenet.raw"
