@@ -7,7 +7,6 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-#include <algorithm>
 
 enum class LayerType : uint8_t {
     Conv2d = 0,
@@ -99,7 +98,7 @@ class Conv2d : public Layer {
                         for (size_t w = 0; w < kernel_size; ++w)
                         {
                             float weights; 
-                            inputfile.read(reinterpret_cast<char*>(&weights), sizeof(weights));
+                            inputfile.read(reinterpret_cast<char*>(&weights) , sizeof(float));
                             weights_(oc, ic, h, w) = weights; 
                         }
                     }
@@ -109,7 +108,8 @@ class Conv2d : public Layer {
             for (size_t b = 0; b < output_.C; ++b)
             {
                 float bias; 
-                inputfile.read(reinterpret_cast<char*>(&bias), sizeof(bias));
+                //(&magic_number) + sizeof(uint32_t)
+                inputfile.read(reinterpret_cast<char *>(&bias), sizeof(float));
                 bias_(0,0,0,b) = bias; 
             }
         }
@@ -197,7 +197,7 @@ class Linear : public Layer {
                         for (size_t ww = 0; ww < weights_.W; ++ww)
                         {
                             float weights; 
-                            inputfile.read(reinterpret_cast<char*>(&weights), sizeof(weights));
+                            inputfile.read(reinterpret_cast<char*>(&weights) , sizeof(float));
                             weights_(wn, wc, wh, ww) = weights; 
                         }
                     }
@@ -206,7 +206,7 @@ class Linear : public Layer {
             for (size_t b = 0; b < weights_.W; ++b)
             {
                 float bias; 
-                inputfile.read(reinterpret_cast<char*>(&bias), sizeof(bias)); 
+                inputfile.read(reinterpret_cast<char *>(&bias), sizeof(float)); 
                 bias_(0,0,0,b) = bias;
             }
         }
@@ -345,15 +345,25 @@ class SoftMax : public Layer {
         void fwd()
         {   
             output_ = Tensor(input_.N, input_.C, input_.H, input_.W);
-            float sum_exp = 0.0;
-            for (size_t w = 0; w < input_.W; ++w)
-            {
-                sum_exp += exp(input_(0,0,0,w)); 
-            } 
-            for (size_t i = 0; i < input_.W; ++i)
-            {
-                output_(0,0,0,i) = exp(input_(0,0,0,i)) / sum_exp; 
+
+            for (size_t n = 0; n < input_.N; ++n) {
+                for (size_t c = 0; c < input_.C; ++c) {
+                    for (size_t h = 0; h < input_.H; ++h) {
+                        float sum_exp = 0.0f;
+
+                        // Calculate sum of exponentials for each position along the last dimension
+                        for (size_t w = 0; w < input_.W; ++w) {
+                            sum_exp += exp(input_(n, c, h, w));
+                        }
+
+                        // Apply SoftMax
+                        for (size_t w = 0; w < input_.W; ++w) {
+                            output_(n, c, h, w) = exp(input_(n, c, h, w)) / sum_exp;
+                        }
+                    }
+                }
             }
+
             if (output_.empty())
             {
                 std::cout << "Output tensor is empty after fwd()! \n"; 
@@ -399,66 +409,66 @@ class Flatten : public Layer {
 class NeuralNetwork {
     public:
         NeuralNetwork(bool debug=false) : debug_(debug) {}
-.
-        void add(Layer* layer) {
-            // TODO
-            // This works by trying to "push" all the layers into one container. 
-            assert(layer != NULL); 
-            NN.push_back(layer); 
 
+        void add(std::unique_ptr<Layer> layer) 
+        {
+            NN.push_back(std::move(layer));
         }
 
-        void load(std::string file) {
+        void load(std::string file) 
+        {
             // TODO
-            // only for layers where you implmement read_weights_bias() you need to take care of loading the weights and biases   
-            std::ifstream is(path_.c_str(), std::ios::in | std::ios::binary);
-            for (auto layer : NN)
-            {
-                layer->read_weights_bias(file); 
-            }
+             std::ifstream inputfile(file, std::ios::in | std::ios::binary); 
+             for (const auto& layer : NN)
+             {
+                layer->read_weights_bias(inputfile); 
+             }
         }
 
-        Tensor predict(Tensor input) {
-            // TODO
-            //print the input digit along with the probabilities  
-            //add layers using the method 
-            add(Conv2d(1, 6, 5));
-            add(ReLu());
-            add(MaxPool2d(2)); 
-            add(Conv2d(6, 16, 5));
-            add(ReLu());
-            add(MaxPool2d(2)); 
-            add(Flatten());
-            add(Linear(400, 120));
-            add(ReLu());
-            add(Linear(120, 84));
-            add(ReLu());
-            add(Linear(84, 10));
-            add(ReLu()); 
-            add(SoftMax()); 
-
-            Tensor ouput = input;
-            //printting the output of the layers. 
-            for (auto layer : lenet)
+        Tensor predict(Tensor input) 
+        {
+            Tensor output = input;
+            // Initializing the architecture layer's. 
+            add(std::make_unique<Conv2d>(1, 6, 5));
+            add(std::make_unique<ReLu>());
+            add(std::make_unique<MaxPool2d>(2));
+            add(std::make_unique<Conv2d>(6, 16, 5));
+            add(std::make_unique<ReLu>());
+            add(std::make_unique<MaxPool2d>(2));
+            add(std::make_unique<Flatten>());
+            add(std::make_unique<Linear>(400, 120));
+            add(std::make_unique<ReLu>());
+            add(std::make_unique<Linear>(120, 84));
+            add(std::make_unique<ReLu>());
+            add(std::make_unique<Linear>(84, 10));
+            add(std::make_unique<ReLu>());
+            add(std::make_unique<SoftMax>());
+            for (const auto& layer : NN)
             {
-                layer->set_input(output);
+                layer->set_input(output); 
                 layer->fwd();
-                output = layer->get_output();   
-            }         
-            
-            if(debug_)
-            {
-                for (size_t w = 0; w < output_.W; ++w)
-                { 
-                std::cout << w << "\n" << output_(0,0,0,w) << "\n"; 
+                output = layer->get_output();
+                if (debug_)
+                {
+                    layer->print();
                 }
             }
-            return output_
+            if (debug_)
+            {
+            for (size_t n = 0; n < output.W; ++n)
+            {
+                
+                std::cout << n  << ": " << output(0,0,0,n) << "\n";
+            }
+            } 
+            return output;
         }
+
     private:
         bool debug_;
-        std::vector<Layer*> NN;   
-        // TODO: storage for layers
+        // storage for layers
+        std::vector<std::unique_ptr<Layer>> NN;;
+        
 };
 
 #endif // NETWORK_HPP
