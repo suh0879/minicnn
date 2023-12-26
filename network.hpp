@@ -7,6 +7,8 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <math.h>
+#include <algorithm>
 
 enum class LayerType : uint8_t {
     Conv2d = 0,
@@ -44,16 +46,21 @@ class Layer {
             if (!output_.empty())  std::cout << "  output: "  << output_  << std::endl;
         }
 
-        void set_input(Tensor input)
-        {
-            input_ = input; 
-        }
+        void set_input(Tensor input) { input_ = input; }
 
-        Tensor get_output()
-        {
-            return output_; 
-        }
-        // TODO: additional required methods
+        void set_weights(Tensor weights) { weights_ = weights; } // only used to conduct tests
+
+        void set_bias(Tensor bias) { bias_ = bias; } // only used to conduct tests
+        
+        Tensor get_bias() const { return bias_; }
+
+        Tensor get_weights() const { return weights_; }
+        
+        Tensor get_output() { return output_; }
+
+        LayerType get_layer_type() { return layer_type_; }
+
+        Tensor get_input() { return input_; }
 
     protected:
         const LayerType layer_type_;
@@ -178,6 +185,7 @@ class Linear : public Layer {
         Linear(size_t in_features, size_t out_features) 
         : Layer(LayerType::Linear), in_features(in_features), out_features(out_features) 
         {
+            // TODO: initialize based on input_ instead of hard_numbers.
             weights_ = Tensor(1, 1, in_features, out_features);
             bias_ = Tensor(1, 1, 1, out_features); 
         }
@@ -286,7 +294,14 @@ class MaxPool2d : public Layer {
                             {
                                 for (size_t kw = 0; kw < kernel_size; ++kw)
                                 {
-                                    values.push_back(input_(n,c,kh,kw)); 
+                                    size_t input_h = stride * h + kh - 2*pad;
+                                    size_t input_w = stride * w + kw - 2*pad;
+                                    if (input_h < 0 || input_h >= input_.H || input_w < 0 || input_w >= input_.W) 
+                                    {
+                                        std::cerr << "Error: Input indices out of bounds." << std::endl;
+                                        return;
+                                    }
+                                    values.push_back(input_(n,c,input_h,input_w)); 
                                 }
                             }
                             output_(n,c,h,w) = *(std::max_element(values.begin(), values.end())); 
@@ -346,18 +361,21 @@ class SoftMax : public Layer {
         {   
             output_ = Tensor(input_.N, input_.C, input_.H, input_.W);
 
-            for (size_t n = 0; n < input_.N; ++n) {
-                for (size_t c = 0; c < input_.C; ++c) {
-                    for (size_t h = 0; h < input_.H; ++h) {
+            for (size_t n = 0; n < input_.N; ++n) 
+            {
+                for (size_t c = 0; c < input_.C; ++c) 
+                {
+                    for (size_t h = 0; h < input_.H; ++h) 
+                    {
                         float sum_exp = 0.0f;
-
-                        // Calculate sum of exponentials for each position along the last dimension
-                        for (size_t w = 0; w < input_.W; ++w) {
+                        for (size_t w = 0; w < input_.W; ++w) 
+                        {
                             sum_exp += exp(input_(n, c, h, w));
                         }
 
                         // Apply SoftMax
-                        for (size_t w = 0; w < input_.W; ++w) {
+                        for (size_t w = 0; w < input_.W; ++w) 
+                        {
                             output_(n, c, h, w) = exp(input_(n, c, h, w)) / sum_exp;
                         }
                     }
@@ -410,39 +428,31 @@ class NeuralNetwork {
     public:
         NeuralNetwork(bool debug=false) : debug_(debug) {}
 
-        void add(std::unique_ptr<Layer> layer) 
+        void add(Layer* layer) 
         {
-            NN.push_back(std::move(layer));
+            NN.push_back(layer);
         }
 
         void load(std::string file) 
         {
             // TODO
-             std::ifstream inputfile(file, std::ios::in | std::ios::binary); 
-             for (const auto& layer : NN)
-             {
+            std::ifstream inputfile(file, std::ios::in | std::ios::binary); 
+             
+            if (!inputfile.is_open())
+            {
+                std::cerr << "Failed to open file: " << file << std::endl;
+                return;
+            }
+            for (const auto& layer : NN)
+            {
                 layer->read_weights_bias(inputfile); 
-             }
+            }
         }
 
         Tensor predict(Tensor input) 
         {
             Tensor output = input;
-            // Initializing the architecture layer's. 
-            add(std::make_unique<Conv2d>(1, 6, 5));
-            add(std::make_unique<ReLu>());
-            add(std::make_unique<MaxPool2d>(2));
-            add(std::make_unique<Conv2d>(6, 16, 5));
-            add(std::make_unique<ReLu>());
-            add(std::make_unique<MaxPool2d>(2));
-            add(std::make_unique<Flatten>());
-            add(std::make_unique<Linear>(400, 120));
-            add(std::make_unique<ReLu>());
-            add(std::make_unique<Linear>(120, 84));
-            add(std::make_unique<ReLu>());
-            add(std::make_unique<Linear>(84, 10));
-            add(std::make_unique<ReLu>());
-            add(std::make_unique<SoftMax>());
+            
             for (const auto& layer : NN)
             {
                 layer->set_input(output); 
@@ -451,15 +461,23 @@ class NeuralNetwork {
                 if (debug_)
                 {
                     layer->print();
+                    std::cout << "input : \n";
+                    layer->get_input().print();
+                    //std::cout << "bias : \n";
+                    //layer->get_bias().print();
+                    //std::cout << "weights : \n";
+                    //layer->get_weights().print();
+                    //std::cout << "output : \n";
+                    //layer->get_output().print();
                 }
             }
             if (debug_)
             {
-            for (size_t n = 0; n < output.W; ++n)
-            {
-                
-                std::cout << n  << ": " << output(0,0,0,n) << "\n";
-            }
+                for (size_t n = 0; n < output.W; ++n)
+                {
+                    
+                    std::cout << n  << ": " << output(0,0,0,n) << "\n";
+                }
             } 
             return output;
         }
@@ -467,7 +485,7 @@ class NeuralNetwork {
     private:
         bool debug_;
         // storage for layers
-        std::vector<std::unique_ptr<Layer>> NN;;
+        std::vector<Layer *> NN; 
         
 };
 

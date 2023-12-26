@@ -1,28 +1,28 @@
-#define CATCH_CONFIG_MAIN
-#include <catch2/catch.hpp>
-#include "/mnt/d/AI-Engineering-THI/Systems-Engineering/minicnn/minicnn/minicnn/tensor.hpp"
-#include "/mnt/d/AI-Engineering-THI/Systems-Engineering/minicnn/minicnn/minicnn/network.hpp"
-#include "/mnt/d/AI-Engineering-THI/Systems-Engineering/minicnn/minicnn/minicnn/mnist.hpp"
+#include "tensor.hpp"
+#include "network.hpp"
+#include "mnist.hpp"
 #include <iostream> 
 #include <fstream> 
 #include <string>
+#include <algorithm>
+#include <math.h>
 
-TEST_CASE("Conv2d forward pass works correctly", "[Conv2d]")
+void assertval(float expected, float actual, float epsilon = 1e-5) 
 {
-    size_t in_channels = 1;
-    size_t out_channels = 6;
-    size_t kernel_size = 5;
-    size_t stride = 1;
-    size_t pad = 0;
+        assert(std::abs(expected - actual) < epsilon);
+}
+
+int main(void)
+{
 
     std::string mnistPath = "/mnt/d/Etudes/Computer-Vision/assignment/t10k-images-idx3-ubyte";
     MNIST mnist(mnistPath);
-
     
+  
     // Entire LeNet-5 described; // 
     // 1st Convolution 
-    Conv2d conv_layer(in_channels, out_channels, kernel_size, stride, pad);
-    Tensor input_ = mnist.at(1); 
+    Conv2d conv_layer(1, 6, 5);
+    Tensor input_ = mnist.at(0); 
     std::cout << input_ << std::endl; 
     conv_layer.set_input(input_); 
     std::ifstream file("/mnt/d/Etudes/Computer-Vision/assignment/lenet.raw", std::ios::in | std::ios::binary); 
@@ -36,13 +36,13 @@ TEST_CASE("Conv2d forward pass works correctly", "[Conv2d]")
     relu_1.fwd(); 
     relu_1.print();
     // 1st MaxPool
-    MaxPool2d  maxpool_1(2); 
+    MaxPool2d  maxpool_1(2); // not changing dimensions as seen: 
     Tensor input_3 =  relu_1.get_output(); 
     maxpool_1.set_input(input_3);
     maxpool_1.fwd(); 
     maxpool_1.print();
     // second convolution
-    Conv2d conv_layer_2(6, 16, 5, stride, pad); 
+    Conv2d conv_layer_2(6, 16, 5); 
     Tensor input_4 = maxpool_1.get_output(); 
     conv_layer_2.set_input(input_4);
     conv_layer_2.read_weights_bias(file); 
@@ -103,9 +103,40 @@ TEST_CASE("Conv2d forward pass works correctly", "[Conv2d]")
     softmax_1.print(); 
     softmax_1.get_output().print();
     // Seeing the output values 
-    /*
-    NeuralNetwork lenet(true);
-    lenet.load("/mnt/d/Etudes/Computer-Vision/assignment/lenet.raw"); 
-    Tensor result = lenet.predict(mnist.at(0));
+    
+    
+    
+
+    
+      /*
+    // Defining the network
+    NeuralNetwork LeNet;
+    LeNet.add(new Conv2d(1, 6, 5));
+    LeNet.add(new ReLu());
+    LeNet.add(new MaxPool2d(2));
+    LeNet.add(new Conv2d(6, 16, 5));
+    LeNet.add(new ReLu());
+    LeNet.add(new MaxPool2d(2));
+    LeNet.add(new Flatten());
+    LeNet.add(new Linear(400, 120));
+    LeNet.add(new ReLu());
+    LeNet.add(new Linear(120, 84));
+    LeNet.add(new ReLu());
+    LeNet.add(new Linear(84, 10));
+    LeNet.add(new ReLu());
+    LeNet.add(new SoftMax());
+
+
+    // Loading bias & weights; 
+    LeNet.load("/mnt/d/Etudes/Computer-Vision/assignment/lenet.raw");
+
+    // Predict using an input -> 0 : "7"; 
+    size_t input_index = 2;
+    Tensor output = LeNet.predict(mnist.at(input_index));
+    //mnist.at(input_index).print();
+    mnist.print(input_index);
+    output.print();
     */
+    return 0; 
 }
+

@@ -20,7 +20,7 @@ class MNIST {
         // train-labels-idx1-ubyte: training set labels
         // t10k-images-idx3-ubyte:  test set images
         // t10k-labels-idx1-ubyte:  test set labels 
-        MNIST(std::string path) : pad_(PRE_PAD), path_(path) {
+        MNIST(std::string path) : pad_(2), path_(path) {
             load();
         }
 
