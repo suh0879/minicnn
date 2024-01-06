@@ -121,58 +121,48 @@ class Conv2d : public Layer {
             }
         }
 
-        void fwd() 
-        {
-            if (input_.empty() || weights_.empty() || bias_.empty()) 
-            {
-                if (weights_.empty()) {std::cerr << "Weights is null." << std::endl; }
-                if (bias_.empty()) {std::cerr << "Bias is null." << std::endl; }
-                if (input_.empty()) {std::cerr << "Input is null." << std::endl; }
-                return;  
-            }
-            output_H = ((input_.H + 2 * pad - kernel_size) / stride) + 1;
-            output_W = ((input_.W + 2 * pad - kernel_size) / stride) + 1;
-            output_ = Tensor(input_.N, out_channels, output_H, output_W); 
-            for (size_t n = 0; n < output_.N; ++n)
-            {
-                for (size_t c = 0; c < output_.C; ++c)
-                {
-                    for (size_t h = 0; h < output_.H; ++h)
-                    {
-                        for (size_t w = 0; w < output_.W; ++w)
-                        {
-                            float value = 0.0; 
-                            for (size_t wo = 0; wo < weights_.N; ++wo)
-                            {
-                                for (size_t wi = 0; wi < weights_.C; ++wi)
-                                {
-                                    for (size_t wh = 0; wh < weights_.H; ++wh)
-                                    {
-                                        for (size_t ww = 0; ww < weights_.W; ++ww)
-                                        {
-                                            size_t input_h = stride * h + wh - 2*pad;
-                                            size_t input_w = stride * w + ww - 2*pad;
-                                            if (input_h < 0 || input_h >= input_.H || input_w < 0 || input_w >= input_.W) 
-                                            {
-                                                std::cerr << "Error: Input indices out of bounds." << std::endl;
-                                                return;
-                                            }
-                                            value += input_(n, wi, input_h, input_w)*weights_(wo, wi, wh, ww);
-                                        }
-                                    }
-                                }
+        void fwd() {
+        if (input_.empty() || weights_.empty() || bias_.empty()) {
+            if (weights_.empty()) { std::cerr << "Weights is null." << std::endl; }
+            if (bias_.empty()) { std::cerr << "Bias is null." << std::endl; }
+            if (input_.empty()) { std::cerr << "Input is null." << std::endl; }
+            return;
+        }
 
+        output_H = ((input_.H + 2 * pad - kernel_size) / stride) + 1;
+        output_W = ((input_.W + 2 * pad - kernel_size) / stride) + 1;
+
+        // Initialize output tensor with correct dimensions
+        output_ = Tensor(input_.N, out_channels, output_H, output_W);
+
+        for (size_t n = 0; n < output_.N; ++n) {
+            for (size_t c = 0; c < output_.C; ++c) {
+                for (size_t h = 0; h < output_.H; ++h) {
+                    for (size_t w = 0; w < output_.W; ++w) {
+                        float value = 0.0;
+                        for (size_t wi = 0; wi < weights_.C; ++wi) {
+                            for (size_t wh = 0; wh < weights_.H; ++wh) {
+                                for (size_t ww = 0; ww < weights_.W; ++ww) {
+                                    size_t input_h = stride * h + wh - pad;
+                                    size_t input_w = stride * w + ww - pad;
+                                    if (input_h < 0 || input_h >= input_.H || input_w < 0 || input_w >= input_.W) {
+                                        std::cerr << "Error: Input indices out of bounds." << std::endl;
+                                        return;
+                                    }
+                                    value += input_(n, wi, input_h, input_w) * weights_(c, wi, wh, ww);
+                                }
                             }
-                            output_(n,c,h,w) = value + bias_(0,0,0,c);
                         }
+                        output_(n, c, h, w) = value + bias_(0, 0, 0, c);
                     }
                 }
             }
-            if (output_.empty())
-            {
-                std::cout << "Output tensor is empty after fwd()! \n"; 
-            }
         }
+
+        if (output_.empty()) {
+            std::cout << "Output tensor is empty after fwd()! \n";
+        }
+    }   
 
 };
 
@@ -253,7 +243,6 @@ class Linear : public Layer {
                 std::cout << "Output tensor is empty after fwd()! \n"; 
             }
         }
-    // TODO.
 };
 
 
@@ -296,12 +285,14 @@ class MaxPool2d : public Layer {
                                 {
                                     size_t input_h = stride * h + kh - 2*pad;
                                     size_t input_w = stride * w + kw - 2*pad;
-                                    if (input_h < 0 || input_h >= input_.H || input_w < 0 || input_w >= input_.W) 
+                                    if (input_h >= 0 && input_h < input_.H && input_w >= 0 && input_w < input_.W) 
                                     {
-                                        std::cerr << "Error: Input indices out of bounds." << std::endl;
-                                        return;
+                                        values.push_back(input_(n,c,input_h,input_w)); 
                                     }
-                                    values.push_back(input_(n,c,input_h,input_w)); 
+                                    else 
+                                    {
+                                        values.push_back(0.0); 
+                                    } 
                                 }
                             }
                             output_(n,c,h,w) = *(std::max_element(values.begin(), values.end())); 
