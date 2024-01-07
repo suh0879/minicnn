@@ -131,17 +131,25 @@ class Conv2d : public Layer {
         output_W = ((input_.W + 2 * pad - kernel_size) / stride) + 1;
         output_ = Tensor(input_.N, out_channels, output_H, output_W);
 
-        for (size_t n = 0; n < output_.N; ++n) {
-            for (size_t c = 0; c < output_.C; ++c) {
-                for (size_t h = 0; h < output_.H; ++h) {
-                    for (size_t w = 0; w < output_.W; ++w) {
+        for (size_t n = 0; n < output_.N; ++n) 
+        {
+            for (size_t c = 0; c < output_.C; ++c) 
+            {
+                for (size_t h = 0; h < output_.H; ++h) 
+                {
+                    for (size_t w = 0; w < output_.W; ++w) 
+                    {
                         float value = 0.0;
-                        for (size_t wi = 0; wi < weights_.C; ++wi) {
-                            for (size_t wh = 0; wh < weights_.H; ++wh) {
-                                for (size_t ww = 0; ww < weights_.W; ++ww) {
+                        for (size_t wi = 0; wi < weights_.C; ++wi) 
+                        {
+                            for (size_t wh = 0; wh < weights_.H; ++wh) 
+                            {
+                                for (size_t ww = 0; ww < weights_.W; ++ww) 
+                                {
                                     size_t input_h = stride * h + wh - pad;
                                     size_t input_w = stride * w + ww - pad;
-                                    if (input_h < 0 || input_h >= input_.H || input_w < 0 || input_w >= input_.W) {
+                                    if (input_h < 0 || input_h >= input_.H || input_w < 0 || input_w >= input_.W) 
+                                    {
                                         std::cerr << "Error: Input indices out of bounds." << std::endl;
                                         return;
                                     }
@@ -155,7 +163,8 @@ class Conv2d : public Layer {
             }
         }
 
-        if (output_.empty()) {
+        if (output_.empty()) 
+        {
             std::cout << "Output tensor is empty after fwd()! \n";
         }
     }   
@@ -447,13 +456,13 @@ class NeuralNetwork {
                 {
                     layer->print();
                     std::cout << "input : \n";
-                    layer->get_input().print();
+                    layer->get_input();
                     std::cout << "bias : \n";
-                    layer->get_bias().print();
+                    layer->get_bias();
                     std::cout << "weights : \n";
-                    layer->get_weights().print();
+                    layer->get_weights();
                     std::cout << "output : \n";
-                    layer->get_output().print();
+                    layer->get_output();
                 }
             }
             if (debug_)
