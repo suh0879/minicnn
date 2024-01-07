@@ -85,7 +85,6 @@ class Conv2d : public Layer {
         : Layer(LayerType::Conv2d), in_channels(in_channels), out_channels(out_channels),
           kernel_size(kernel_size), stride(stride), pad(pad)
           {
-            // Just to initialize Conv2d specific variables; 
                 weights_ = Tensor(out_channels, in_channels, kernel_size, kernel_size);
                 bias_ = Tensor(1,1,1,out_channels); 
           }
@@ -112,10 +111,9 @@ class Conv2d : public Layer {
                 }
             }
 
-            for (size_t b = 0; b < output_.C; ++b)
+            for (size_t b = 0; b < out_channels; ++b)
             {
                 float bias; 
-                //(&magic_number) + sizeof(uint32_t)
                 inputfile.read(reinterpret_cast<char *>(&bias), sizeof(float));
                 bias_(0,0,0,b) = bias; 
             }
@@ -131,8 +129,6 @@ class Conv2d : public Layer {
 
         output_H = ((input_.H + 2 * pad - kernel_size) / stride) + 1;
         output_W = ((input_.W + 2 * pad - kernel_size) / stride) + 1;
-
-        // Initialize output tensor with correct dimensions
         output_ = Tensor(input_.N, out_channels, output_H, output_W);
 
         for (size_t n = 0; n < output_.N; ++n) {
@@ -175,8 +171,7 @@ class Linear : public Layer {
         Linear(size_t in_features, size_t out_features) 
         : Layer(LayerType::Linear), in_features(in_features), out_features(out_features) 
         {
-            // TODO: initialize based on input_ instead of hard_numbers.
-            weights_ = Tensor(1, 1, in_features, out_features);
+            weights_ = Tensor(1, 1, out_features, in_features);
             bias_ = Tensor(1, 1, 1, out_features); 
         }
 
@@ -201,7 +196,7 @@ class Linear : public Layer {
                     }
                 }
             }
-            for (size_t b = 0; b < weights_.W; ++b)
+            for (size_t b = 0; b < out_features; ++b)
             {
                 float bias; 
                 inputfile.read(reinterpret_cast<char *>(&bias), sizeof(float)); 
@@ -227,11 +222,11 @@ class Linear : public Layer {
                     {
                         for (size_t w = 0; w < output_.W; ++w)
                         {
-                            // output is row of a -> col of b
+                            // Matrix Multiplication 
                             float value = 0.0;
                             for (size_t i = 0; i < in_features; ++i)
                             {
-                                value += input_(n, c, h, i)*weights_(n, c, i, w); 
+                                value += input_(n, c, h, i)*weights_(n, c, w, i); // oc - ic  
                             }
                             output_(n, c, h, w) = value + bias_(0, 0, 0, w); 
                         }
@@ -426,7 +421,6 @@ class NeuralNetwork {
 
         void load(std::string file) 
         {
-            // TODO
             std::ifstream inputfile(file, std::ios::in | std::ios::binary); 
              
             if (!inputfile.is_open())
@@ -454,12 +448,12 @@ class NeuralNetwork {
                     layer->print();
                     std::cout << "input : \n";
                     layer->get_input().print();
-                    //std::cout << "bias : \n";
-                    //layer->get_bias().print();
-                    //std::cout << "weights : \n";
-                    //layer->get_weights().print();
-                    //std::cout << "output : \n";
-                    //layer->get_output().print();
+                    std::cout << "bias : \n";
+                    layer->get_bias().print();
+                    std::cout << "weights : \n";
+                    layer->get_weights().print();
+                    std::cout << "output : \n";
+                    layer->get_output().print();
                 }
             }
             if (debug_)
